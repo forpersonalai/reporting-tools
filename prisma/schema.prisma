@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  MANAGER
+  USER
+}
+
+enum ReportStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ReportFileType {
+  PDF
+  EXCEL
+  WORD
+  CSV
+  HTML
+}
+
+enum PrintStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  CANCELLED
+}
+
+model User {
+  id            String         @id @default(cuid())
+  name          String
+  email         String         @unique
+  password      String
+  role          Role           @default(USER)
+  department    String?
+  avatarUrl     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  sessions      Session[]
+  reports       Report[]
+  printLogs     PrintLog[]
+  notifications Notification[]
+  apiKeys       ApiKey[]
+  webhooks      Webhook[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+model Report {
+  id          String         @id @default(cuid())
+  title       String
+  description String?        @db.Text
+  category    String
+  fileUrl     String?
+  fileType    ReportFileType @default(PDF)
+  status      ReportStatus   @default(DRAFT)
+  tags        String?        @db.Text
+  metadata    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  createdById String
+  createdBy   User           @relation(fields: [createdById], references: [id])
+  printLogs   PrintLog[]
+
+  @@index([createdById])
+  @@index([category])
+  @@index([status])
+  @@map("reports")
+}
+
+model PrintLog {
+  id          String      @id @default(cuid())
+  reportId    String
+  userId      String
+  printedAt   DateTime    @default(now())
+  copies      Int         @default(1)
+  pageCount   Int?
+  printerName String?
+  ipAddress   String?
+  userAgent   String?     @db.Text
+  status      PrintStatus @default(SUCCESS)
+  notes       String?     @db.Text
+  duration    Int?
+  report      Report      @relation(fields: [reportId], references: [id])
+  user        User        @relation(fields: [userId], references: [id])
+
+  @@index([reportId])
+  @@index([userId])
+  @@index([printedAt])
+  @@index([status])
+  @@map("print_logs")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ApiKey {
+  id         String        @id @default(cuid())
+  name       String
+  keyHash    String        @unique
+  keyPrefix  String
+  userId     String
+  scopes     String        @db.Text
+  rateLimit  Int           @default(1000)
+  lastUsedAt DateTime?
+  expiresAt  DateTime?
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usageLogs  ApiKeyUsage[]
+
+  @@index([keyPrefix])
+  @@map("api_keys")
+}
+
+model ApiKeyUsage {
+  id         String   @id @default(cuid())
+  apiKeyId   String
+  endpoint   String
+  method     String
+  statusCode Int
+  duration   Int
+  ip         String?
+  createdAt  DateTime @default(now())
+  apiKey     ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId, createdAt])
+  @@map("api_key_usage")
+}
+
+model Webhook {
+  id           String    @id @default(cuid())
+  userId       String
+  url          String
+  secret       String
+  events       String    @db.Text
+  isActive     Boolean   @default(true)
+  failCount    Int       @default(0)
+  lastCalledAt DateTime?
+  createdAt    DateTime  @default(now())
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("webhooks")
+}
