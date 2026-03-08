@@ -38,18 +38,22 @@ export function AISummaryPanel() {
   }
 
   return (
-    <Card className="fade-up border-primary/15 bg-gradient-to-br from-primary/6 via-card to-accent/35">
-      <CardHeader className="flex-col gap-4 md:flex-row md:items-center md:justify-between">
+    <Card className="fade-up overflow-hidden border-primary/15 bg-gradient-to-br from-primary/8 via-card to-accent/35">
+      <CardHeader className="flex-col gap-4">
         <div>
-          <CardTitle className="flex items-center gap-2 text-xl">
+          <p className="text-xs uppercase tracking-[0.22em] text-primary">AI dashboard summary</p>
+          <CardTitle className="mt-3 flex items-center gap-2 text-xl md:text-2xl">
             <Sparkles className="h-5 w-5 text-primary" />
-            AI Dashboard Summary
+            Insight otomatis untuk manajemen
           </CardTitle>
-          <p className="mt-2 text-sm text-muted-foreground">Analisis otomatis berdasarkan statistik dashboard, print log, dan anomali aktivitas.</p>
+          <p className="mt-2 text-sm leading-6 text-muted-foreground">Analisis otomatis berdasarkan statistik dashboard, print log, dan anomali aktivitas yang terlihat di halaman ini.</p>
         </div>
-        <div className="flex items-center gap-3">
-          {lastUpdated && <span className="text-xs text-muted-foreground">Diperbarui {lastUpdated}</span>}
-          <Button onClick={generateSummary} disabled={isLoading}>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[24px] border border-border bg-background/70 p-4">
+          <div>
+            <p className="text-sm font-semibold">Ringkasan siap dibuat kapan saja</p>
+            <p className="mt-1 text-sm text-muted-foreground">{lastUpdated ? `Diperbarui ${lastUpdated}` : "Belum ada ringkasan terbaru"}</p>
+          </div>
+          <Button onClick={generateSummary} disabled={isLoading} className="rounded-full">
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />

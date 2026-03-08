@@ -134,9 +134,8 @@ export function ReportDesignerSection({
               key={field}
               type="button"
               onClick={() => onToggleFieldSelection(field)}
-              className={`rounded-full border px-3 py-1.5 text-xs transition ${
-                selected ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground"
-              }`}
+              className={`rounded-full border px-3 py-1.5 text-xs transition ${selected ? "border-primary bg-primary/10 text-primary" : "border-border bg-background text-muted-foreground"
+                }`}
             >
               {getFieldLabel(sourceName, field)}
             </button>
