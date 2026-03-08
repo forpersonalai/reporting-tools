@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ReportFileType, ReportStatus } from "@prisma/client";
+import { ZodError } from "zod";
 
 import { prisma } from "@/lib/db";
 import { getReportById } from "@/lib/dashboard";
-import { generateReportPdf } from "@/lib/report-pdf";
-import { normalizeWorkflowMetadata } from "@/lib/report-workflow";
+import {
+  buildReportUpdateData,
+  normalizeReportPayload,
+  publishReportPdfForRecord,
+} from "@/lib/report-api";
 
 export async function GET(_: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,20 +23,12 @@ export async function GET(_: NextRequest, { params }: { params: Promise<{ id: st
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const body = (await req.json()) as Record<string, unknown>;
+  const payload = normalizeReportPayload(body);
 
   try {
     const report = await prisma.report.update({
       where: { id },
-      data: {
-        title: typeof body.title === "string" ? body.title : undefined,
-        description: typeof body.description === "string" ? body.description : undefined,
-        category: typeof body.category === "string" ? body.category : undefined,
-        fileUrl: typeof body.fileUrl === "string" ? body.fileUrl || null : undefined,
-        fileType: (body.fileType as ReportFileType | undefined) ?? undefined,
-        status: (body.status as ReportStatus | undefined) ?? undefined,
-        tags: Array.isArray(body.tags) ? JSON.stringify(body.tags) : undefined,
-        metadata: typeof body.metadata === "object" ? (body.metadata as object) : undefined,
-      },
+      data: buildReportUpdateData(payload),
       include: {
         createdBy: {
           select: {
@@ -43,30 +38,20 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       },
     });
 
-    if (report.status === "PUBLISHED") {
-      const workflow = normalizeWorkflowMetadata(report.metadata);
-      const pdf = await generateReportPdf({
-        reportId: report.id,
-        title: report.title,
-        category: report.category,
-        description: report.description ?? "",
-        createdByName: report.createdBy.name,
-        workflow,
-      });
-
-      const published = await prisma.report.update({
-        where: { id: report.id },
-        data: {
-          fileUrl: pdf.publicUrl,
-          fileType: "PDF",
-        },
-      });
-
+    if (payload.status === "PUBLISHED") {
+      const published = await publishReportPdfForRecord(report, report.createdBy.name);
       return NextResponse.json({ success: true, data: published });
     }
 
     return NextResponse.json({ success: true, data: report });
-  } catch {
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { success: false, error: { code: "VALIDATION_ERROR", message: error.issues[0]?.message ?? "Payload laporan tidak valid." } },
+        { status: 400 },
+      );
+    }
+
     return NextResponse.json({ success: false, error: { code: "NOT_FOUND", message: "Report not found" } }, { status: 404 });
   }
 }

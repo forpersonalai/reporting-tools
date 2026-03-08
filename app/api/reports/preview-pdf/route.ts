@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ZodError } from "zod";
 
 import { auth } from "@/lib/auth";
-import { buildReportPdfBytes } from "@/lib/report-pdf";
-import { buildOutputFileName, normalizeWorkflowMetadata } from "@/lib/report-workflow";
+import { buildPreviewPdfFile, normalizeReportPayload } from "@/lib/report-api";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -19,23 +19,28 @@ export async function POST(req: NextRequest) {
     description?: string;
     metadata?: unknown;
   };
+  try {
+    const payload = normalizeReportPayload(body as Record<string, unknown>);
+    const { fileName, pdfBytes } = await buildPreviewPdfFile(payload, session.user.name ?? "Demo Admin");
 
-  const workflow = normalizeWorkflowMetadata(body.metadata);
-  const fileName = workflow.outputName || buildOutputFileName(String(body.title ?? "Preview Report"), workflow.parameters);
-  const pdfBytes = await buildReportPdfBytes({
-    reportId: "preview",
-    title: String(body.title ?? "Preview Report"),
-    category: String(body.category ?? "General"),
-    description: String(body.description ?? ""),
-    createdByName: session.user.name ?? "Demo Admin",
-    workflow,
-  });
+    return new NextResponse(Buffer.from(pdfBytes), {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `inline; filename="${fileName}"`,
+        "Cache-Control": "no-store",
+      },
+    });
+  } catch (error) {
+    if (error instanceof ZodError) {
+      return NextResponse.json(
+        { success: false, error: { code: "VALIDATION_ERROR", message: error.issues[0]?.message ?? "Payload preview tidak valid." } },
+        { status: 400 },
+      );
+    }
 
-  return new NextResponse(Buffer.from(pdfBytes), {
-    headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${fileName}"`,
-      "Cache-Control": "no-store",
-    },
-  });
+    return NextResponse.json(
+      { success: false, error: { code: "PDF_PREVIEW_FAILED", message: "Gagal membuat preview PDF." } },
+      { status: 500 },
+    );
+  }
 }
